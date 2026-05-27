@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LINQ PR Approval Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f4;
+    --bg3: #efefed;
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --text3: #9b9b96;
+    --border: rgba(0,0,0,0.1);
+    --border2: rgba(0,0,0,0.18);
+    --blue: #185FA5;
+    --blue-bg: #E6F1FB;
+    --red: #E24B4A;
+    --red-bg: #FCEBEB;
+    --amber: #BA7517;
+    --amber-bg: #FAEEDA;
+    --green: #3B6D11;
+    --green-bg: #EAF3DE;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg2: #252523;
+      --bg3: #2e2e2b;
+      --text: #f0ede8;
+      --text2: #a8a8a3;
+      --text3: #6b6b67;
+      --border: rgba(255,255,255,0.1);
+      --border2: rgba(255,255,255,0.18);
+      --blue: #85B7EB;
+      --blue-bg: #0C447C;
+      --red: #F09595;
+      --red-bg: #501313;
+      --amber: #EF9F27;
+      --amber-bg: #633806;
+      --green: #97C459;
+      --green-bg: #27500A;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg3);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--bg);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 500;
+  }
+  .logo svg { opacity: 0.7; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .last-updated { font-size: 12px; color: var(--text3); }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.1s;
+  }
+  .btn:hover { background: var(--bg2); }
+  .btn-primary { background: var(--blue); color: #fff; border-color: transparent; }
+  .btn-primary:hover { opacity: 0.9; background: var(--blue); }
+
+  /* ── Layout ── */
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 24px 48px; }
+
+  /* ── Token gate ── */
+  #token-gate {
+    background: var(--bg);
+    border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border);
+    padding: 40px;
+    text-align: center;
+    max-width: 480px;
+    margin: 80px auto;
+  }
+  #token-gate h2 { font-size: 18px; font-weight: 500; margin-bottom: 8px; }
+  #token-gate p { color: var(--text2); font-size: 13px; margin-bottom: 24px; line-height: 1.6; }
+  #token-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--bg2);
+    color: var(--text);
+    font-size: 13px;
+    font-family: monospace;
+    margin-bottom: 12px;
+    outline: none;
+  }
+  #token-input:focus { border-color: var(--blue); }
+  .token-hint { font-size: 11px; color: var(--text3); margin-bottom: 16px; }
+  .token-hint a { color: var(--blue); }
+  #token-error { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
+
+  /* ── Stats grid ── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat {
+    background: var(--bg);
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border);
+    padding: 14px 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-value { font-size: 26px; font-weight: 500; }
+  .stat-value.red { color: var(--red); }
+  .stat-value.amber { color: var(--amber); }
+  .stat-value.green { color: var(--green); }
+
+  /* ── Filters ── */
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toolbar select, .toolbar input[type="text"] {
+    padding: 7px 11px;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    height: 34px;
+  }
+  .toolbar select { min-width: 160px; }
+  .toolbar input[type="text"] { flex: 1; min-width: 180px; }
+  .toolbar select:focus, .toolbar input:focus { border-color: var(--blue); }
+  .result-count { font-size: 12px; color: var(--text3); margin-left: auto; white-space: nowrap; }
+
+  /* ── Table ── */
+  .table-wrap {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text2);
+    text-align: left;
+    padding: 8px 14px;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg2);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  td {
+    padding: 11px 14px;
+    border-bottom: 0.5px solid var(--border);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg2); }
+
+  .repo-header td {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text2);
+    background: var(--bg2);
+    padding: 6px 14px;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .pr-link { color: var(--blue); text-decoration: none; font-weight: 500; font-size: 13px; }
+  .pr-link:hover { text-decoration: underline; }
+  .pr-title { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.4; max-width: 260px; }
+
+  .pips { display: flex; align-items: center; gap: 4px; }
+  .pip {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+  }
+  .pip.filled { background: var(--green); border-color: var(--green); color: #fff; }
+  .pip-label { font-size: 11px; color: var(--text2); margin-left: 4px; }
+
+  .reviewer {
+    display: inline-block;
+    font-size: 11px;
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 8px;
+    color: var(--text2);
+    margin: 2px;
+  }
+
+  .avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--blue-bg);
+    color: var(--blue);
+    font-size: 9px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  .age { font-size: 12px; color: var(--text3); white-space: nowrap; }
+  .age.urgent { color: var(--red); font-weight: 500; }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge-red { background: var(--red-bg); color: var(--red); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber); }
+
+  .empty {
+    text-align: center;
+    padding: 48px;
+    color: var(--text3);
+  }
+
+  /* ── Loading / error ── */
+  #loading {
+    text-align: center;
+    padding: 80px 24px;
+    color: var(--text2);
+  }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 2.5px solid var(--border2);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #error-banner {
+    background: var(--red-bg);
+    color: var(--red);
+    border: 0.5px solid var(--red);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    display: none;
+  }
+
+  /* ── Success state ── */
+  #success {
+    text-align: center;
+    padding: 60px 24px;
+    display: none;
+  }
+  .check-circle {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--green-bg);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 26px;
+  }
+
+  #dashboard { display: none; }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .settings-row h1 { font-size: 18px; font-weight: 500; }
+
+  .change-token-btn {
+    font-size: 11px;
+    color: var(--text3);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+  }
+  .change-token-btn:hover { color: var(--text2); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <rect x="2" y="2" width="7" height="7" rx="1.5" fill="currentColor"/>
+      <rect x="11" y="2" width="7" height="7" rx="1.5" fill="currentColor" opacity=".4"/>
+      <rect x="2" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity=".4"/>
+      <rect x="11" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity=".7"/>
+    </svg>
+    LINQ PR Approval Dashboard
+  </div>
+  <div class="header-right">
+    <span class="last-updated" id="last-updated"></span>
+    <button class="btn" id="refresh-btn" onclick="runAudit()" style="display:none">
+      ↻ Refresh
+    </button>
+  </div>
+</header>
+
+<!-- Token gate -->
+<div id="token-gate">
+  <h2>Connect to GitHub</h2>
+  <p>Enter a GitHub personal access token with <code>repo</code> scope to load live PR data from the LINQ-ERP org.</p>
+  <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+  <p class="token-hint">
+    <a href="https://github.com/settings/tokens/new?scopes=repo&description=LINQ+PR+Dashboard" target="_blank">Generate a token</a>
+    — your token is stored only in this browser (localStorage) and never sent anywhere except GitHub's API.
+  </p>
+  <button class="btn btn-primary" onclick="saveToken()" style="width:100%">Connect →</button>
+  <div id="token-error">Invalid token or no access to LINQ-ERP. Check your token has <code>repo</code> scope.</div>
+</div>
+
+<!-- Main dashboard -->
+<main id="dashboard">
+  <div class="settings-row">
+    <h1>PR Approval Audit</h1>
+    <button class="change-token-btn" onclick="changeToken()">change token</button>
+  </div>
+
+  <div id="error-banner"></div>
+  <div id="loading" style="display:none"><div class="spinner"></div>Fetching pull requests…</div>
+
+  <div id="results" style="display:none">
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Needs attention</div><div class="stat-value red" id="s-total">—</div></div>
+      <div class="stat"><div class="stat-label">Zero approvals</div><div class="stat-value red" id="s-zero">—</div></div>
+      <div class="stat"><div class="stat-label">One approval</div><div class="stat-value amber" id="s-one">—</div></div>
+      <div class="stat"><div class="stat-label">Repos affected</div><div class="stat-value" id="s-repos">—</div></div>
+    </div>
+
+    <div class="toolbar">
+      <select id="f-repo" onchange="renderTable()"><option value="">All repos</option></select>
+      <select id="f-approvals" onchange="renderTable()">
+        <option value="">All statuses</option>
+        <option value="0">0 approvals</option>
+        <option value="1">1 approval</option>
+      </select>
+      <input type="text" id="f-search" placeholder="Search title or author…" oninput="renderTable()" />
+      <span class="result-count" id="result-count"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>PR</th>
+            <th>Author</th>
+            <th style="text-align:center">Approvals</th>
+            <th>Awaiting review</th>
+            <th>Age</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div class="empty" id="table-empty" style="display:none">No PRs match the current filters.</div>
+    </div>
+  </div>
+
+  <div id="success">
+    <div class="check-circle">✓</div>
+    <h2 style="font-size:18px;font-weight:500;margin-bottom:8px">All clear!</h2>
+    <p style="color:var(--text2);font-size:13px">All non-draft PRs with reviewers have 2 or more approvals.</p>
+    <p style="color:var(--text3);font-size:12px;margin-top:8px" id="success-time"></p>
+  </div>
+</main>
+
+<script>
+const ORG = 'LINQ-ERP';
+const REPOS = [
+  'LINQ-ERP-v4','AlioDotNetCore','AlioReportsMorphis',
+  'alioNet','LinqErpRelease','LINQ_ERP_DB','AlioPortalsNet'
+];
+const REQUIRED = 2;
+
+let allFindings = [];
+
+// ── Token management ──────────────────────────────────────────────────────────
+function getToken() { return localStorage.getItem('linq_gh_token') || ''; }
+function setToken(t) { localStorage.setItem('linq_gh_token', t); }
+function clearToken() { localStorage.removeItem('linq_gh_token'); }
+
+function saveToken() {
+  const t = document.getElementById('token-input').value.trim();
+  if (!t) return;
+  setToken(t);
+  document.getElementById('token-error').style.display = 'none';
+  showDashboard();
+  runAudit();
+}
+
+function changeToken() {
+  clearToken();
+  allFindings = [];
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('token-gate').style.display = 'block';
+  document.getElementById('token-input').value = '';
+  document.getElementById('refresh-btn').style.display = 'none';
+  document.getElementById('last-updated').textContent = '';
+}
+
+function showDashboard() {
+  document.getElementById('token-gate').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('refresh-btn').style.display = 'inline-flex';
+}
+
+// ── GitHub API ────────────────────────────────────────────────────────────────
+async function ghFetch(path, token) {
+  const url = `https://api.github.com${path}`;
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  let results = [];
+  let nextUrl = url;
+  let params = '?state=open&per_page=100';
+  while (nextUrl) {
+    const resp = await fetch(nextUrl.includes('?') ? nextUrl : nextUrl + params, { headers });
+    if (resp.status === 401 || resp.status === 403) throw new Error(`auth:${resp.status}`);
+    if (resp.status === 404) return null;
+    if (!resp.ok) throw new Error(`http:${resp.status}`);
+    const data = await resp.json();
+    if (Array.isArray(data)) {
+      results = results.concat(data);
+      const link = resp.headers.get('Link') || '';
+      const next = link.match(/<([^>]+)>;\s*rel="next"/);
+      nextUrl = next ? next[1] : null;
+      params = '';
+    } else {
+      return data;
+    }
+  }
+  return results;
+}
+
+async function getReviews(repo, num, token) {
+  const all = await ghFetch(`/repos/${ORG}/${repo}/pulls/${num}/reviews`, token) || [];
+  const latest = {};
+  for (const r of all) latest[r.user.login] = r;
+  return Object.values(latest);
+}
+
+async function auditRepo(repo, token) {
+  const prs = await ghFetch(`/repos/${ORG}/${repo}/pulls`, token) || [];
+  const results = [];
+  for (const pr of prs) {
+    if (pr.draft) continue;
+    const reviews = await getReviews(repo, pr.number, token);
+    const approvers = reviews.filter(r => r.state === 'APPROVED').map(r => r.user.login);
+    const changeRequests = reviews.filter(r => r.state === 'CHANGES_REQUESTED').map(r => r.user.login);
+    if (approvers.length < REQUIRED) {
+      results.push({
+        repo, number: pr.number, title: pr.title, url: pr.html_url,
+        author: pr.user.login, created_at: pr.created_at,
+        approvals: approvers.length, approvers,
+        approvals_needed: REQUIRED - approvers.length,
+        requested_reviewers: (pr.requested_reviewers || []).map(u => u.login),
+        requested_teams: (pr.requested_teams || []).map(t => t.slug),
+        change_requests: changeRequests,
+        labels: (pr.labels || []).map(l => l.name),
+      });
+    }
+  }
+  return results;
+}
+
+// ── Run audit ─────────────────────────────────────────────────────────────────
+async function runAudit() {
+  const token = getToken();
+  if (!token) return;
+
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('success').style.display = 'none';
+  document.getElementById('error-banner').style.display = 'none';
+  document.getElementById('last-updated').textContent = 'Loading…';
+
+  const findings = [];
+  for (const repo of REPOS) {
+    try {
+      const hits = await auditRepo(repo, token);
+      findings.push(...hits);
+    } catch (e) {
+      if (e.message.startsWith('auth:')) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error-banner').textContent =
+          'Authentication failed. Your token may be expired or missing repo scope. Click "change token" to update it.';
+        document.getElementById('error-banner').style.display = 'block';
+        document.getElementById('results').style.display = 'block';
+        return;
+      }
+      console.warn(`Error fetching ${repo}:`, e);
+    }
+  }
+
+  document.getElementById('loading').style.display = 'none';
+  allFindings = findings;
+
+  const now = new Date();
+  document.getElementById('last-updated').textContent =
+    `Updated ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+
+  // Populate repo filter
+  const repos = [...new Set(findings.map(p => p.repo))].sort();
+  const sel = document.getElementById('f-repo');
+  sel.innerHTML = '<option value="">All repos</option>';
+  repos.forEach(r => {
+    const o = document.createElement('option');
+    o.value = r; o.textContent = r;
+    sel.appendChild(o);
+  });
+
+  if (findings.length === 0) {
+    document.getElementById('success').style.display = 'block';
+    document.getElementById('success-time').textContent =
+      `Checked at ${now.toLocaleString()}`;
+  } else {
+    document.getElementById('results').style.display = 'block';
+    renderTable();
+  }
+}
+
+// ── Render table ──────────────────────────────────────────────────────────────
+function renderTable() {
+  const repoF = document.getElementById('f-repo').value;
+  const appF = document.getElementById('f-approvals').value;
+  const searchF = document.getElementById('f-search').value.toLowerCase();
+
+  let data = allFindings.filter(p => {
+    if (repoF && p.repo !== repoF) return false;
+    if (appF !== '' && p.approvals !== parseInt(appF)) return false;
+    if (searchF && !p.title.toLowerCase().includes(searchF) && !p.author.toLowerCase().includes(searchF)) return false;
+    return true;
+  }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  // Stats
+  document.getElementById('s-total').textContent = allFindings.length;
+  document.getElementById('s-zero').textContent = allFindings.filter(p => p.approvals === 0).length;
+  document.getElementById('s-one').textContent = allFindings.filter(p => p.approvals === 1).length;
+  document.getElementById('s-repos').textContent = new Set(allFindings.map(p => p.repo)).size;
+  document.getElementById('result-count').textContent =
+    `${data.length} PR${data.length !== 1 ? 's' : ''} shown`;
+
+  const tbody = document.getElementById('table-body');
+  const empty = document.getElementById('table-empty');
+
+  if (!data.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const byRepo = {};
+  data.forEach(p => { (byRepo[p.repo] = byRepo[p.repo] || []).push(p); });
+
+  let html = '';
+  Object.entries(byRepo).sort().forEach(([repo, prs]) => {
+    html += `<tr class="repo-header"><td colspan="5">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="margin-right:6px;vertical-align:-1px">
+        <path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm0 2.122a2.25 2.25 0 1 0-1.5 0v.878A2.25 2.25 0 0 0 5.75 8.5h1.5v2.128a2.251 2.251 0 1 0 1.5 0V8.5h1.5a2.25 2.25 0 0 0 2.25-2.25v-.878a2.25 2.25 0 1 0-1.5 0v.878a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 6.25v-.878zm3.75 7.378a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm3-8.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/>
+      </svg>
+      ${repo} &nbsp;<span style="font-weight:400;color:var(--text3)">${prs.length} PR${prs.length!==1?'s':''}</span>
+    </td></tr>`;
+
+    prs.sort((a, b) => a.number - b.number).forEach(pr => {
+      const days = Math.round((Date.now() - new Date(pr.created_at)) / 86400000);
+      const ageClass = days >= 10 ? 'age urgent' : 'age';
+      const ageText = days === 0 ? 'today' : `${days}d old`;
+      const badge = pr.approvals === 0
+        ? '<span class="badge badge-red">needs 2</span>'
+        : '<span class="badge badge-amber">needs 1</span>';
+
+      let pipsHtml = '<div class="pips">';
+      for (let i = 0; i < REQUIRED; i++) {
+        pipsHtml += i < pr.approvals
+          ? '<span class="pip filled">✓</span>'
+          : '<span class="pip"></span>';
+      }
+      pipsHtml += `<span class="pip-label">${pr.approvals}/${REQUIRED}</span></div>`;
+
+      const reviewers = pr.requested_reviewers.length
+        ? pr.requested_reviewers.map(r => `<span class="reviewer">@${r}</span>`).join('')
+        : '<span style="color:var(--text3);font-size:12px">—</span>';
+
+      const initials = pr.author.slice(0, 2).toUpperCase();
+
+      html += `<tr>
+        <td>
+          <a class="pr-link" href="${pr.url}" target="_blank">#${pr.number}</a>
+          ${badge}
+          <div class="pr-title">${pr.title}</div>
+        </td>
+        <td>
+          <span class="avatar">${initials}</span>
+          <span style="font-size:13px">@${pr.author}</span>
+        </td>
+        <td style="text-align:center">${pipsHtml}</td>
+        <td>${reviewers}</td>
+        <td><span class="${ageClass}">${ageText}</span></td>
+      </tr>`;
+    });
+  });
+
+  tbody.innerHTML = html;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.getElementById('token-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveToken();
+});
+
+if (getToken()) {
+  showDashboard();
+  runAudit();
+}
+</script>
+</body>
+</html>
