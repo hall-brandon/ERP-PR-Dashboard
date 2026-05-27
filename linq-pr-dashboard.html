@@ -82,6 +82,22 @@
   .logo svg { opacity: 0.7; }
   .header-right { display: flex; align-items: center; gap: 12px; }
   .last-updated { font-size: 12px; color: var(--text3); }
+  .auto-refresh-toggle {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text3);
+    cursor: pointer;
+    user-select: none;
+  }
+  .auto-refresh-toggle input[type="checkbox"] {
+    width: 13px;
+    height: 13px;
+    accent-color: var(--blue);
+    cursor: pointer;
+    margin: 0;
+  }
   .btn {
     display: inline-flex;
     align-items: center;
@@ -211,11 +227,12 @@
   /* ── Stats grid ── */
   .stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 10px;
     margin-bottom: 20px;
   }
-  @media (max-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 760px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 480px) { .stats { grid-template-columns: repeat(2, 1fr); } }
   .stat {
     background: var(--bg);
     border-radius: var(--radius);
@@ -227,6 +244,38 @@
   .stat-value.red { color: var(--red); }
   .stat-value.amber { color: var(--amber); }
   .stat-value.green { color: var(--green); }
+  .stat-value.blue { color: var(--blue); }
+
+  .stat-repos {
+    position: relative;
+    cursor: default;
+  }
+  .repo-tooltip {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 180px;
+    background: var(--bg);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.9;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    white-space: nowrap;
+  }
+  .stat-repos:hover .repo-tooltip { opacity: 1; }
+
+  .reviewer-blocking {
+    background: var(--red-bg);
+    border-color: var(--red);
+    color: var(--red);
+  }
 
   /* ── Filters ── */
   .toolbar {
@@ -292,7 +341,7 @@
   .pr-link:hover { text-decoration: underline; }
   .pr-title { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.4; max-width: 260px; }
 
-  .pips { display: flex; align-items: center; gap: 4px; }
+  .pips { display: flex; align-items: center; justify-content: center; gap: 4px; }
   .pip {
     width: 16px; height: 16px;
     border-radius: 50%;
@@ -341,6 +390,20 @@
   }
   .badge-red { background: var(--red-bg); color: var(--red); }
   .badge-amber { background: var(--amber-bg); color: var(--amber); }
+  .badge-blue { background: var(--blue-bg); color: var(--blue); }
+  .badge-gray { background: var(--bg3); color: var(--text3); border: 0.5px solid var(--border2); }
+
+  .toolbar-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    color: var(--text2);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .toolbar-check input[type="checkbox"] { accent-color: var(--blue); cursor: pointer; margin: 0; }
 
   .empty {
     text-align: center;
@@ -428,6 +491,10 @@
   </div>
   <div class="header-right">
     <span class="last-updated" id="last-updated"></span>
+    <label class="auto-refresh-toggle" id="auto-refresh-toggle">
+      <input type="checkbox" id="auto-refresh-cb" checked onchange="toggleAutoRefresh()" />
+      Auto-refresh
+    </label>
     <button class="btn" id="refresh-btn" onclick="runAudit()" style="display:none">
       ↻ Refresh
     </button>
@@ -471,7 +538,7 @@
 <!-- Main dashboard -->
 <main id="dashboard">
   <div class="settings-row">
-    <h1>PR Approval Audit</h1>
+    <h1>PRs Needing Review</h1>
     <button class="change-token-btn" onclick="changeToken()">change token</button>
   </div>
 
@@ -484,6 +551,12 @@
       <div class="stat"><div class="stat-label">Zero approvals</div><div class="stat-value red" id="s-zero">—</div></div>
       <div class="stat"><div class="stat-label">One approval</div><div class="stat-value amber" id="s-one">—</div></div>
       <div class="stat"><div class="stat-label">Repos affected</div><div class="stat-value" id="s-repos">—</div></div>
+      <div class="stat stat-repos">
+        <div class="stat-label">Total repos</div>
+        <div class="stat-value" id="s-total-repos">—</div>
+        <div class="repo-tooltip" id="repo-tooltip"></div>
+      </div>
+      <div class="stat"><div class="stat-label">My PRs</div><div class="stat-value blue" id="s-mine">—</div></div>
     </div>
 
     <div class="toolbar">
@@ -493,7 +566,15 @@
         <option value="0">0 approvals</option>
         <option value="1">1 approval</option>
       </select>
+      <select id="f-mine" onchange="renderTable()">
+        <option value="">All PRs</option>
+        <option value="mine">My PRs</option>
+      </select>
       <input type="text" id="f-search" placeholder="Search title or author…" oninput="renderTable()" />
+      <label class="toolbar-check">
+        <input type="checkbox" id="f-drafts" onchange="renderTable()" />
+        Include drafts
+      </label>
       <span class="result-count" id="result-count"></span>
     </div>
 
@@ -504,7 +585,8 @@
             <th>PR</th>
             <th>Author</th>
             <th style="text-align:center">Approvals</th>
-            <th>Awaiting review</th>
+            <th>Changes requested</th>
+            <th style="text-align:center">Open comments</th>
             <th>Age</th>
           </tr>
         </thead>
@@ -532,6 +614,9 @@ const REQUIRED = 2;
 const EXCLUDED_AUTHORS = ['prabhatkeshari'];
 
 let allFindings = [];
+let currentUser = null;
+let autoRefreshTimer = null;
+const AUTO_REFRESH_MS = 30 * 60 * 1000;
 
 // ── Token management ──────────────────────────────────────────────────────────
 function getToken() { return localStorage.getItem('linq_gh_token') || ''; }
@@ -550,20 +635,62 @@ function saveToken() {
 function changeToken() {
   clearToken();
   allFindings = [];
+  currentUser = null;
+  stopAutoRefresh();
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('token-gate').style.display = 'block';
   document.getElementById('token-input').value = '';
   document.getElementById('refresh-btn').style.display = 'none';
+  document.getElementById('auto-refresh-toggle').style.display = 'none';
   document.getElementById('last-updated').textContent = '';
+}
+
+function toggleAutoRefresh() {
+  const enabled = document.getElementById('auto-refresh-cb').checked;
+  if (enabled) {
+    startAutoRefresh();
+  } else {
+    stopAutoRefresh();
+    // Strip the "Next refresh" part from the timestamp when disabled
+    const el = document.getElementById('last-updated');
+    el.textContent = el.textContent.replace(/ · Next refresh .+/, '');
+  }
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  const cb = document.getElementById('auto-refresh-cb');
+  if (cb && !cb.checked) return;
+  autoRefreshTimer = setTimeout(runAudit, AUTO_REFRESH_MS);
+}
+
+function stopAutoRefresh() {
+  if (autoRefreshTimer) { clearTimeout(autoRefreshTimer); autoRefreshTimer = null; }
 }
 
 function showDashboard() {
   document.getElementById('token-gate').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
   document.getElementById('refresh-btn').style.display = 'inline-flex';
+  document.getElementById('auto-refresh-toggle').style.display = 'inline-flex';
 }
 
 // ── GitHub API ────────────────────────────────────────────────────────────────
+async function fetchCurrentUser(token) {
+  try {
+    const resp = await fetch('https://api.github.com/user', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      }
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.login || null;
+  } catch { return null; }
+}
+
 async function ghFetch(path, token) {
   const url = `https://api.github.com${path}`;
   const headers = {
@@ -600,24 +727,51 @@ async function getReviews(repo, num, token) {
   return Object.values(latest);
 }
 
+async function getUnresolvedThreadCount(repo, num, token) {
+  const query = `query($owner:String!,$repo:String!,$number:Int!){
+    repository(owner:$owner,name:$repo){
+      pullRequest(number:$number){
+        reviewThreads(first:100){ nodes{ isResolved } }
+      }
+    }
+  }`;
+  try {
+    const resp = await fetch('https://api.github.com/graphql', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables: { owner: ORG, repo, number: num } }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const threads = data?.data?.repository?.pullRequest?.reviewThreads?.nodes || [];
+    return threads.filter(t => !t.isResolved).length;
+  } catch {
+    return null;
+  }
+}
+
 async function auditRepo(repo, token) {
   const prs = await ghFetch(`/repos/${ORG}/${repo}/pulls`, token) || [];
   const results = [];
   for (const pr of prs) {
-    if (pr.draft) continue;
     if (EXCLUDED_AUTHORS.includes(pr.user.login)) continue;
-    const reviews = await getReviews(repo, pr.number, token);
+    const [reviews, unresolvedThreads] = await Promise.all([
+      getReviews(repo, pr.number, token),
+      getUnresolvedThreadCount(repo, pr.number, token),
+    ]);
     const approvers = reviews.filter(r => r.state === 'APPROVED').map(r => r.user.login);
     const changeRequests = reviews.filter(r => r.state === 'CHANGES_REQUESTED').map(r => r.user.login);
     if (approvers.length < REQUIRED) {
       results.push({
         repo, number: pr.number, title: pr.title, url: pr.html_url,
         author: pr.user.login, created_at: pr.created_at,
+        draft: pr.draft || false,
         approvals: approvers.length, approvers,
         approvals_needed: REQUIRED - approvers.length,
         requested_reviewers: (pr.requested_reviewers || []).map(u => u.login),
         requested_teams: (pr.requested_teams || []).map(t => t.slug),
         change_requests: changeRequests,
+        unresolved_threads: unresolvedThreads,
         labels: (pr.labels || []).map(l => l.name),
       });
     }
@@ -629,6 +783,7 @@ async function auditRepo(repo, token) {
 async function runAudit() {
   const token = getToken();
   if (!token) return;
+  if (!currentUser) currentUser = await fetchCurrentUser(token);
 
   document.getElementById('loading').style.display = 'block';
   document.getElementById('results').style.display = 'none';
@@ -658,8 +813,12 @@ async function runAudit() {
   allFindings = findings;
 
   const now = new Date();
+  const autoEnabled = document.getElementById('auto-refresh-cb')?.checked !== false;
+  const nextRefresh = new Date(now.getTime() + AUTO_REFRESH_MS);
+  const nextStr = autoEnabled ? ` · Next refresh ${nextRefresh.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}` : '';
   document.getElementById('last-updated').textContent =
-    `Updated ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+    `Updated ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}${nextStr}`;
+  startAutoRefresh();
 
   // Populate repo filter
   const repos = [...new Set(findings.map(p => p.repo))].sort();
@@ -685,20 +844,26 @@ async function runAudit() {
 function renderTable() {
   const repoF = document.getElementById('f-repo').value;
   const appF = document.getElementById('f-approvals').value;
+  const mineF = document.getElementById('f-mine').value;
+  const draftsF = document.getElementById('f-drafts').checked;
   const searchF = document.getElementById('f-search').value.toLowerCase();
 
-  let data = allFindings.filter(p => {
+  const statsBase = allFindings.filter(p => draftsF || !p.draft);
+
+  let data = statsBase.filter(p => {
     if (repoF && p.repo !== repoF) return false;
     if (appF !== '' && p.approvals !== parseInt(appF)) return false;
+    if (mineF === 'mine' && p.author !== currentUser) return false;
     if (searchF && !p.title.toLowerCase().includes(searchF) && !p.author.toLowerCase().includes(searchF)) return false;
     return true;
   }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
   // Stats
-  document.getElementById('s-total').textContent = allFindings.length;
-  document.getElementById('s-zero').textContent = allFindings.filter(p => p.approvals === 0).length;
-  document.getElementById('s-one').textContent = allFindings.filter(p => p.approvals === 1).length;
-  document.getElementById('s-repos').textContent = new Set(allFindings.map(p => p.repo)).size;
+  document.getElementById('s-total').textContent = statsBase.length;
+  document.getElementById('s-zero').textContent = statsBase.filter(p => p.approvals === 0).length;
+  document.getElementById('s-one').textContent = statsBase.filter(p => p.approvals === 1).length;
+  document.getElementById('s-repos').textContent = new Set(statsBase.map(p => p.repo)).size;
+  document.getElementById('s-mine').textContent = currentUser ? statsBase.filter(p => p.author === currentUser).length : '—';
   document.getElementById('result-count').textContent =
     `${data.length} PR${data.length !== 1 ? 's' : ''} shown`;
 
@@ -717,7 +882,7 @@ function renderTable() {
 
   let html = '';
   Object.entries(byRepo).sort().forEach(([repo, prs]) => {
-    html += `<tr class="repo-header"><td colspan="5">
+    html += `<tr class="repo-header"><td colspan="6">
       <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="margin-right:6px;vertical-align:-1px">
         <path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm0 2.122a2.25 2.25 0 1 0-1.5 0v.878A2.25 2.25 0 0 0 5.75 8.5h1.5v2.128a2.251 2.251 0 1 0 1.5 0V8.5h1.5a2.25 2.25 0 0 0 2.25-2.25v-.878a2.25 2.25 0 1 0-1.5 0v.878a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 6.25v-.878zm3.75 7.378a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm3-8.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/>
       </svg>
@@ -735,21 +900,29 @@ function renderTable() {
       let pipsHtml = '<div class="pips">';
       for (let i = 0; i < REQUIRED; i++) {
         pipsHtml += i < pr.approvals
-          ? '<span class="pip filled">✓</span>'
+          ? `<span class="pip filled" title="${pr.approvers[i]}">✓</span>`
           : '<span class="pip"></span>';
       }
       pipsHtml += `<span class="pip-label">${pr.approvals}/${REQUIRED}</span></div>`;
 
-      const reviewers = pr.requested_reviewers.length
-        ? pr.requested_reviewers.map(r => `<span class="reviewer">@${r}</span>`).join('')
+      const reviewers = pr.change_requests.length
+        ? pr.change_requests.map(r => `<span class="reviewer reviewer-blocking">@${r}</span>`).join('')
         : '<span style="color:var(--text3);font-size:12px">—</span>';
 
+      const unresolvedHtml = pr.unresolved_threads === null
+        ? '<span style="color:var(--text3);font-size:12px">—</span>'
+        : pr.unresolved_threads === 0
+          ? '<span style="color:var(--text3);font-size:12px">—</span>'
+          : `<span class="badge badge-amber">${pr.unresolved_threads}</span>`;
+
+      const mineBadge = currentUser && pr.author === currentUser ? '<span class="badge badge-blue">Mine</span>' : '';
+      const draftBadge = pr.draft ? '<span class="badge badge-gray">Draft</span>' : '';
       const initials = pr.author.slice(0, 2).toUpperCase();
 
       html += `<tr>
         <td>
           <a class="pr-link" href="${pr.url}" target="_blank">#${pr.number}</a>
-          ${badge}
+          ${badge}${mineBadge}${draftBadge}
           <div class="pr-title">${pr.title}</div>
         </td>
         <td>
@@ -758,6 +931,7 @@ function renderTable() {
         </td>
         <td style="text-align:center">${pipsHtml}</td>
         <td>${reviewers}</td>
+        <td style="text-align:center">${unresolvedHtml}</td>
         <td><span class="${ageClass}">${ageText}</span></td>
       </tr>`;
     });
@@ -778,6 +952,10 @@ function togglePat() {
 document.getElementById('token-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') saveToken();
 });
+
+// Populate total repos stat and tooltip (static, from REPOS constant)
+document.getElementById('s-total-repos').textContent = REPOS.length;
+document.getElementById('repo-tooltip').innerHTML = REPOS.map(r => `<div>${r}</div>`).join('');
 
 if (getToken()) {
   showDashboard();
