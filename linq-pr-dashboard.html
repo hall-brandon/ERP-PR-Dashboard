@@ -129,6 +129,82 @@
   #token-input:focus { border-color: var(--blue); }
   .token-hint { font-size: 11px; color: var(--text3); margin-bottom: 16px; }
   .token-hint a { color: var(--blue); }
+
+  .pat-help-link {
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    margin-top: 14px;
+    width: 100%;
+    justify-content: center;
+  }
+  .pat-help-link:hover { color: var(--text); }
+  .pat-chevron {
+    transition: transform 0.2s ease;
+    display: inline-block;
+  }
+  .pat-help-link.open .pat-chevron { transform: rotate(180deg); }
+  .pat-expand {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.25s ease;
+    text-align: left;
+  }
+  .pat-expand.open { max-height: 500px; }
+  .pat-expand-inner {
+    margin-top: 14px;
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .pat-steps { list-style: none; padding: 0; }
+  .pat-steps li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 9px;
+    line-height: 1.5;
+  }
+  .pat-steps li:last-child { margin-bottom: 0; }
+  .step-num {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--blue-bg);
+    color: var(--blue);
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .pat-steps code {
+    font-family: monospace;
+    background: var(--bg3);
+    border-radius: 3px;
+    padding: 1px 4px;
+    font-size: 11px;
+  }
+  .pat-expand-footer {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 0.5px solid var(--border);
+    font-size: 11px;
+    color: var(--text3);
+    line-height: 1.5;
+  }
   #token-error { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
 
   /* ── Stats grid ── */
@@ -362,12 +438,33 @@
   <h2>Connect to GitHub</h2>
   <p>Enter a GitHub personal access token with <code>repo</code> scope to load live PR data from the LINQ-ERP org.</p>
   <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
-  <p class="token-hint">
-    <a href="https://github.com/settings/tokens/new?scopes=repo&description=LINQ+PR+Dashboard" target="_blank">Generate a token</a>
-    — your token is stored only in this browser (localStorage) and never sent anywhere except GitHub's API.
-  </p>
-  <button class="btn btn-primary" onclick="saveToken()" style="width:100%">Connect →</button>
+  <button class="btn btn-primary" onclick="saveToken()" style="width:100%;margin-top:10px">Connect →</button>
   <div id="token-error">Invalid token or no access to LINQ-ERP. Check your token has <code>repo</code> scope.</div>
+
+  <button class="pat-help-link" id="pat-toggle" onclick="togglePat()">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 12.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11zm.75-3.5a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zM8 4.5a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4.5z"/>
+    </svg>
+    How do I get a token?
+    <svg class="pat-chevron" width="11" height="11" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06z"/>
+    </svg>
+  </button>
+
+  <div class="pat-expand" id="pat-expand">
+    <div class="pat-expand-inner">
+      <ol class="pat-steps">
+        <li><span class="step-num">1</span><span>Go to <strong>github.com</strong> → click your profile picture (top right) → <strong>Settings</strong></span></li>
+        <li><span class="step-num">2</span><span>Scroll to the bottom of the left sidebar and click <strong>Developer settings</strong></span></li>
+        <li><span class="step-num">3</span><span>Click <strong>Personal access tokens</strong> → <strong>Tokens (classic)</strong></span></li>
+        <li><span class="step-num">4</span><span>Click <strong>Generate new token (classic)</strong> and give it a name like <em>LINQ PR Dashboard</em></span></li>
+        <li><span class="step-num">5</span><span>Check the <code>repo</code> scope, set an expiration, and click <strong>Generate token</strong></span></li>
+        <li><span class="step-num">6</span><span>Copy the token — it starts with <code>ghp_</code> — and paste it in the field above</span></li>
+        <li><span class="step-num">7</span><span>If your org uses SSO, look for a <strong>Configure SSO</strong> button next to your new token and click <strong>Authorize</strong> next to <strong>LINQ-ERP</strong></span></li>
+      </ol>
+      <div class="pat-expand-footer">Your token is saved only in this browser and is never sent anywhere except GitHub's API.</div>
+    </div>
+  </div>
 </div>
 
 <!-- Main dashboard -->
@@ -431,6 +528,7 @@ const REPOS = [
   'alioNet','LinqErpRelease','LINQ_ERP_DB','AlioPortalsNet'
 ];
 const REQUIRED = 2;
+const EXCLUDED_AUTHORS = ['prabhatkeshari'];
 
 let allFindings = [];
 
@@ -506,6 +604,7 @@ async function auditRepo(repo, token) {
   const results = [];
   for (const pr of prs) {
     if (pr.draft) continue;
+    if (EXCLUDED_AUTHORS.includes(pr.user.login)) continue;
     const reviews = await getReviews(repo, pr.number, token);
     const approvers = reviews.filter(r => r.state === 'APPROVED').map(r => r.user.login);
     const changeRequests = reviews.filter(r => r.state === 'CHANGES_REQUESTED').map(r => r.user.login);
@@ -667,6 +766,14 @@ function renderTable() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+function togglePat() {
+  const btn = document.getElementById('pat-toggle');
+  const panel = document.getElementById('pat-expand');
+  const isOpen = panel.classList.contains('open');
+  panel.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+}
+
 document.getElementById('token-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') saveToken();
 });
