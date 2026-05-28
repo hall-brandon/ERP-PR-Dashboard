@@ -174,7 +174,30 @@
     transition: max-height 0.25s ease;
     text-align: left;
   }
-  .pat-expand.open { max-height: 500px; }
+  .pat-expand.open { max-height: 900px; }
+  .pat-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .pat-tab-btn {
+    flex: 1;
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    background: var(--bg3);
+    color: var(--text2);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .pat-tab-btn.active {
+    background: var(--blue);
+    color: #fff;
+    border-color: transparent;
+  }
+  .pat-tab-btn:not(.active):hover { background: var(--bg2); }
   .pat-expand-inner {
     margin-top: 14px;
     background: var(--bg2);
@@ -592,10 +615,10 @@
 <!-- Token gate -->
 <div id="token-gate">
   <h2>Connect to GitHub</h2>
-  <p>Enter a GitHub personal access token with <code>repo</code> scope to load live PR data from the LINQ-ERP org.</p>
-  <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+  <p>Enter a GitHub personal access token to load live PR data from the LINQ-ERP org.</p>
+  <input type="password" id="token-input" placeholder="Paste your GitHub token here" autocomplete="off" />
   <button class="btn btn-primary" onclick="saveToken()" style="width:100%;margin-top:10px">Connect →</button>
-  <div id="token-error">Invalid token or no access to LINQ-ERP. Check your token has <code>repo</code> scope.</div>
+  <div id="token-error">Invalid token or no access to LINQ-ERP. Check your token permissions and try again.</div>
 
   <button class="pat-help-link" id="pat-toggle" onclick="togglePat()">
     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -609,7 +632,12 @@
 
   <div class="pat-expand" id="pat-expand">
     <div class="pat-expand-inner">
-      <ol class="pat-steps">
+      <div class="pat-tabs">
+        <button class="pat-tab-btn active" id="tab-fine" onclick="showPATTab('fine')">Fine-grained</button>
+        <button class="pat-tab-btn" id="tab-classic" onclick="showPATTab('classic')">Classic</button>
+      </div>
+
+      <ol class="pat-steps" id="pat-steps-classic" style="display:none">
         <li><span class="step-num">1</span><span>Go to <strong>github.com</strong> → click your profile picture (top right) → <strong>Settings</strong></span></li>
         <li><span class="step-num">2</span><span>Scroll to the bottom of the left sidebar and click <strong>Developer settings</strong></span></li>
         <li><span class="step-num">3</span><span>Click <strong>Personal access tokens</strong> → <strong>Tokens (classic)</strong></span></li>
@@ -618,6 +646,21 @@
         <li><span class="step-num">6</span><span>Copy the token — it starts with <code>ghp_</code> — and paste it in the field above</span></li>
         <li><span class="step-num">7</span><span>If your org uses SSO, look for a <strong>Configure SSO</strong> button next to your new token and click <strong>Authorize</strong> next to <strong>LINQ-ERP</strong></span></li>
       </ol>
+
+      <ol class="pat-steps" id="pat-steps-fine">
+        <li><span class="step-num">1</span><span>Go to <strong>github.com</strong> → click your profile picture (top right) → <strong>Settings</strong></span></li>
+        <li><span class="step-num">2</span><span>Scroll to the bottom of the left sidebar and click <strong>Developer settings</strong></span></li>
+        <li><span class="step-num">3</span><span>Click <strong>Personal access tokens</strong> → <strong>Fine-grained tokens</strong></span></li>
+        <li><span class="step-num">4</span><span>Click <strong>Generate new token</strong> and give it a name like <em>LINQ PR Dashboard</em></span></li>
+        <li><span class="step-num">5</span><span>Set an <strong>Expiration</strong> date</span></li>
+        <li><span class="step-num">6</span><span>Under <strong>Resource owner</strong>, select your group's repository (e.g. <strong>LINQ-ERP</strong>) — do not select your personal account</span></li>
+        <li><span class="step-num">7</span><span>Under <strong>Repository access</strong>, select <strong>All repositories</strong></span></li>
+        <li><span class="step-num">8</span><span>Under <strong>Permissions</strong>, click <strong>+ Add permissions</strong> and select <strong>Pull requests</strong> from the list — <strong>Metadata</strong> and <strong>Pull requests</strong> will appear in the permissions box, both defaulting to <strong>Read-only</strong>. Confirm both are set to <strong>Read-only</strong> before continuing</span></li>
+        <li><span class="step-num">9</span><span>Click <strong>Generate token</strong></span></li>
+        <li><span class="step-num">10</span><span>Because the resource owner is an organization, your token will be <strong>pending admin approval</strong> — it won't work until an org admin approves it</span></li>
+        <li><span class="step-num">11</span><span>Once approved, copy the token — it starts with <code>github_pat_</code> — and paste it in the field above</span></li>
+      </ol>
+
       <div class="pat-expand-footer">Your token is saved only in this browser and is never sent anywhere except GitHub's API.</div>
     </div>
   </div>
@@ -956,6 +999,7 @@ async function runAudit() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('results').style.display = 'none';
   document.getElementById('success').style.display = 'none';
+  document.getElementById('ready-section').style.display = 'none';
   document.getElementById('error-banner').style.display = 'none';
   document.getElementById('last-updated').textContent = 'Loading…';
 
@@ -1237,6 +1281,14 @@ function renderReadySection() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+function showPATTab(tab) {
+  const isClassic = tab === 'classic';
+  document.getElementById('pat-steps-classic').style.display = isClassic ? '' : 'none';
+  document.getElementById('pat-steps-fine').style.display = isClassic ? 'none' : '';
+  document.getElementById('tab-classic').classList.toggle('active', isClassic);
+  document.getElementById('tab-fine').classList.toggle('active', !isClassic);
+}
+
 function togglePat() {
   const btn = document.getElementById('pat-toggle');
   const panel = document.getElementById('pat-expand');
