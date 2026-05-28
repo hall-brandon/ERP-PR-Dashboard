@@ -246,30 +246,6 @@
   .stat-value.green { color: var(--green); }
   .stat-value.blue { color: var(--blue); }
 
-  .stat-repos {
-    position: relative;
-    cursor: default;
-  }
-  .repo-tooltip {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    min-width: 180px;
-    background: var(--bg);
-    border: 0.5px solid var(--border2);
-    border-radius: var(--radius);
-    padding: 10px 14px;
-    font-size: 12px;
-    color: var(--text2);
-    line-height: 1.9;
-    z-index: 100;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    white-space: nowrap;
-  }
-  .stat-repos:hover .repo-tooltip { opacity: 1; }
 
   .reviewer-blocking {
     background: var(--red-bg);
@@ -392,6 +368,7 @@
   .badge-amber { background: var(--amber-bg); color: var(--amber); }
   .badge-blue { background: var(--blue-bg); color: var(--blue); }
   .badge-gray { background: var(--bg3); color: var(--text3); border: 0.5px solid var(--border2); }
+  .badge-green { background: var(--green-bg); color: var(--green); }
 
   .toolbar-check {
     display: inline-flex;
@@ -475,6 +452,37 @@
     padding: 0;
   }
   .change-token-btn:hover { color: var(--text2); }
+
+  /* ── Repos nav strip ── */
+  .repos-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+  .repo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 11px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border2);
+    background: var(--bg);
+    color: var(--text2);
+    font-size: 12px;
+    text-decoration: none;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+    white-space: nowrap;
+  }
+  .repo-chip:hover { background: var(--bg2); border-color: var(--blue); color: var(--text); }
+  .repo-chip-count {
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--blue-bg);
+    color: var(--blue);
+    padding: 1px 5px;
+    border-radius: 10px;
+  }
 </style>
 </head>
 <body>
@@ -542,6 +550,8 @@
     <button class="change-token-btn" onclick="changeToken()">change token</button>
   </div>
 
+  <div class="repos-nav" id="repos-nav"></div>
+
   <div id="error-banner"></div>
   <div id="loading" style="display:none"><div class="spinner"></div>Fetching pull requests…</div>
 
@@ -551,10 +561,9 @@
       <div class="stat"><div class="stat-label">Zero approvals</div><div class="stat-value red" id="s-zero">—</div></div>
       <div class="stat"><div class="stat-label">One approval</div><div class="stat-value amber" id="s-one">—</div></div>
       <div class="stat"><div class="stat-label">Repos affected</div><div class="stat-value" id="s-repos">—</div></div>
-      <div class="stat stat-repos">
+      <div class="stat">
         <div class="stat-label">Total repos</div>
         <div class="stat-value" id="s-total-repos">—</div>
-        <div class="repo-tooltip" id="repo-tooltip"></div>
       </div>
       <div class="stat"><div class="stat-label">My PRs</div><div class="stat-value blue" id="s-mine">—</div></div>
     </div>
@@ -673,6 +682,18 @@ function showDashboard() {
   document.getElementById('dashboard').style.display = 'block';
   document.getElementById('refresh-btn').style.display = 'inline-flex';
   document.getElementById('auto-refresh-toggle').style.display = 'inline-flex';
+  renderReposNav();
+}
+
+function renderReposNav(prCounts = {}) {
+  const repoIcon = `<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.6">
+    <path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm0 2.122a2.25 2.25 0 1 0-1.5 0v.878A2.25 2.25 0 0 0 5.75 8.5h1.5v2.128a2.251 2.251 0 1 0 1.5 0V8.5h1.5a2.25 2.25 0 0 0 2.25-2.25v-.878a2.25 2.25 0 1 0-1.5 0v.878a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 6.25v-.878zm3.75 7.378a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm3-8.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/>
+  </svg>`;
+  document.getElementById('repos-nav').innerHTML = REPOS.map(repo => {
+    const count = prCounts[repo] || 0;
+    const countBadge = count > 0 ? `<span class="repo-chip-count">${count}</span>` : '';
+    return `<a class="repo-chip" href="https://github.com/${ORG}/${repo}" target="_blank">${repoIcon}${repo}${countBadge}</a>`;
+  }).join('');
 }
 
 // ── GitHub API ────────────────────────────────────────────────────────────────
@@ -772,6 +793,7 @@ async function auditRepo(repo, token) {
         requested_teams: (pr.requested_teams || []).map(t => t.slug),
         change_requests: changeRequests,
         unresolved_threads: unresolvedThreads,
+        my_review: currentUser ? (reviews.find(r => r.user.login === currentUser && r.state !== 'PENDING')?.state || null) : null,
         labels: (pr.labels || []).map(l => l.name),
       });
     }
@@ -811,6 +833,10 @@ async function runAudit() {
 
   document.getElementById('loading').style.display = 'none';
   allFindings = findings;
+
+  const prCounts = {};
+  findings.filter(p => !p.draft).forEach(p => { prCounts[p.repo] = (prCounts[p.repo] || 0) + 1; });
+  renderReposNav(prCounts);
 
   const now = new Date();
   const autoEnabled = document.getElementById('auto-refresh-cb')?.checked !== false;
@@ -916,13 +942,14 @@ function renderTable() {
           : `<span class="badge badge-amber">${pr.unresolved_threads}</span>`;
 
       const mineBadge = currentUser && pr.author === currentUser ? '<span class="badge badge-blue">Mine</span>' : '';
+      const reviewedBadge = pr.my_review ? `<span class="badge badge-green" title="${pr.my_review.replace(/_/g,' ').toLowerCase()}">Reviewed</span>` : '';
       const draftBadge = pr.draft ? '<span class="badge badge-gray">Draft</span>' : '';
       const initials = pr.author.slice(0, 2).toUpperCase();
 
       html += `<tr>
         <td>
           <a class="pr-link" href="${pr.url}" target="_blank">#${pr.number}</a>
-          ${badge}${mineBadge}${draftBadge}
+          ${badge}${mineBadge}${reviewedBadge}${draftBadge}
           <div class="pr-title">${pr.title}</div>
         </td>
         <td>
@@ -953,9 +980,8 @@ document.getElementById('token-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') saveToken();
 });
 
-// Populate total repos stat and tooltip (static, from REPOS constant)
+// Populate total repos stat (static, from REPOS constant)
 document.getElementById('s-total-repos').textContent = REPOS.length;
-document.getElementById('repo-tooltip').innerHTML = REPOS.map(r => `<div>${r}</div>`).join('');
 
 if (getToken()) {
   showDashboard();
