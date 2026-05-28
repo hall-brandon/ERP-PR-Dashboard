@@ -315,7 +315,8 @@
 
   .pr-link { color: var(--blue); text-decoration: none; font-weight: 500; font-size: 13px; }
   .pr-link:hover { text-decoration: underline; }
-  .pr-title { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.4; max-width: 260px; }
+  .pr-title { font-size: 12px; color: var(--text2); margin-top: 2px; line-height: 1.4; max-width: 260px; text-decoration: none; display: block; }
+  .pr-title:hover { color: var(--text); }
 
   .pips { display: flex; align-items: center; justify-content: center; gap: 4px; }
   .pip {
@@ -1099,7 +1100,7 @@ function renderTable() {
         <td>
           <a class="pr-link" href="${pr.url}" target="_blank">#${pr.number}</a>
           ${badge}${mineBadge}${reviewedBadge}${draftBadge}
-          <div class="pr-title">${pr.title}</div>
+          <a class="pr-title" href="${pr.url}" target="_blank">${pr.title}</a>
         </td>
         <td>
           <span class="avatar">${initials}</span>
@@ -1216,7 +1217,7 @@ function renderReadySection() {
       html += `<tr>
         <td>
           <a class="pr-link" href="${pr.url}" target="_blank">#${pr.number}</a>
-          <div class="pr-title">${pr.title}</div>
+          <a class="pr-title" href="${pr.url}" target="_blank">${pr.title}</a>
         </td>
         <td>${approverPills}</td>
         <td style="text-align:center">${unresolvedHtml}</td>
