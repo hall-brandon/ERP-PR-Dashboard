@@ -611,6 +611,26 @@
     <p style="color:var(--text2);font-size:13px">All non-draft PRs with reviewers have 2 or more approvals.</p>
     <p style="color:var(--text3);font-size:12px;margin-top:8px" id="success-time"></p>
   </div>
+
+  <div id="ready-section" style="display:none; margin-top:32px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <h2 style="font-size:16px;font-weight:500;">My PRs &middot; Ready to Merge</h2>
+      <span class="badge badge-green" id="ready-count-badge"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>PR</th>
+            <th>Approvers</th>
+            <th style="text-align:center">Open comments</th>
+            <th>Age</th>
+          </tr>
+        </thead>
+        <tbody id="ready-body"></tbody>
+      </table>
+    </div>
+  </div>
 </main>
 
 <script>
@@ -623,6 +643,7 @@ const REQUIRED = 2;
 const EXCLUDED_AUTHORS = ['prabhatkeshari'];
 
 let allFindings = [];
+let myReadyPRs = [];
 let currentUser = null;
 let autoRefreshTimer = null;
 const AUTO_REFRESH_MS = 30 * 60 * 1000;
@@ -644,6 +665,7 @@ function saveToken() {
 function changeToken() {
   clearToken();
   allFindings = [];
+  myReadyPRs = [];
   currentUser = null;
   stopAutoRefresh();
   document.getElementById('dashboard').style.display = 'none';
@@ -773,7 +795,8 @@ async function getUnresolvedThreadCount(repo, num, token) {
 
 async function auditRepo(repo, token) {
   const prs = await ghFetch(`/repos/${ORG}/${repo}/pulls`, token) || [];
-  const results = [];
+  const findings = [];
+  const readyPRs = [];
   for (const pr of prs) {
     if (EXCLUDED_AUTHORS.includes(pr.user.login)) continue;
     const [reviews, unresolvedThreads] = await Promise.all([
@@ -783,7 +806,7 @@ async function auditRepo(repo, token) {
     const approvers = reviews.filter(r => r.state === 'APPROVED').map(r => r.user.login);
     const changeRequests = reviews.filter(r => r.state === 'CHANGES_REQUESTED').map(r => r.user.login);
     if (approvers.length < REQUIRED) {
-      results.push({
+      findings.push({
         repo, number: pr.number, title: pr.title, url: pr.html_url,
         author: pr.user.login, created_at: pr.created_at,
         draft: pr.draft || false,
@@ -796,9 +819,16 @@ async function auditRepo(repo, token) {
         my_review: currentUser ? (reviews.find(r => r.user.login === currentUser && r.state !== 'PENDING')?.state || null) : null,
         labels: (pr.labels || []).map(l => l.name),
       });
+    } else if (currentUser && pr.user.login === currentUser && !pr.draft) {
+      readyPRs.push({
+        repo, number: pr.number, title: pr.title, url: pr.html_url,
+        created_at: pr.created_at,
+        approvals: approvers.length, approvers,
+        unresolved_threads: unresolvedThreads,
+      });
     }
   }
-  return results;
+  return { findings, readyPRs };
 }
 
 // ── Run audit ─────────────────────────────────────────────────────────────────
@@ -814,10 +844,12 @@ async function runAudit() {
   document.getElementById('last-updated').textContent = 'Loading…';
 
   const findings = [];
+  const ready = [];
   for (const repo of REPOS) {
     try {
-      const hits = await auditRepo(repo, token);
+      const { findings: hits, readyPRs } = await auditRepo(repo, token);
       findings.push(...hits);
+      ready.push(...readyPRs);
     } catch (e) {
       if (e.message.startsWith('auth:')) {
         document.getElementById('loading').style.display = 'none';
@@ -833,6 +865,8 @@ async function runAudit() {
 
   document.getElementById('loading').style.display = 'none';
   allFindings = findings;
+  myReadyPRs = ready;
+  renderReadySection();
 
   const prCounts = {};
   findings.filter(p => !p.draft).forEach(p => { prCounts[p.repo] = (prCounts[p.repo] || 0) + 1; });
@@ -965,6 +999,52 @@ function renderTable() {
   });
 
   tbody.innerHTML = html;
+}
+
+// ── Ready to merge section ────────────────────────────────────────────────────
+function renderReadySection() {
+  const section = document.getElementById('ready-section');
+  if (!myReadyPRs.length) { section.style.display = 'none'; return; }
+
+  document.getElementById('ready-count-badge').textContent = myReadyPRs.length;
+  section.style.display = 'block';
+
+  const byRepo = {};
+  myReadyPRs.forEach(p => { (byRepo[p.repo] = byRepo[p.repo] || []).push(p); });
+
+  let html = '';
+  Object.entries(byRepo).sort().forEach(([repo, prs]) => {
+    html += `<tr class="repo-header"><td colspan="4">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" style="margin-right:6px;vertical-align:-1px">
+        <path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm0 2.122a2.25 2.25 0 1 0-1.5 0v.878A2.25 2.25 0 0 0 5.75 8.5h1.5v2.128a2.251 2.251 0 1 0 1.5 0V8.5h1.5a2.25 2.25 0 0 0 2.25-2.25v-.878a2.25 2.25 0 1 0-1.5 0v.878a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 6.25v-.878zm3.75 7.378a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0zm3-8.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0z"/>
+      </svg>
+      ${repo} &nbsp;<span style="font-weight:400;color:var(--text3)">${prs.length} PR${prs.length!==1?'s':''}</span>
+    </td></tr>`;
+
+    prs.sort((a, b) => a.number - b.number).forEach(pr => {
+      const days = Math.round((Date.now() - new Date(pr.created_at)) / 86400000);
+      const ageClass = days >= 10 ? 'age urgent' : 'age';
+      const ageText = days === 0 ? 'today' : `${days}d old`;
+
+      const approverPills = pr.approvers.map(a => `<span class="reviewer" style="background:var(--green-bg);border-color:var(--green);color:var(--green)">@${a}</span>`).join('');
+
+      const unresolvedHtml = pr.unresolved_threads === null || pr.unresolved_threads === 0
+        ? '<span style="color:var(--text3);font-size:12px">—</span>'
+        : `<span class="badge badge-amber">${pr.unresolved_threads}</span>`;
+
+      html += `<tr>
+        <td>
+          <a class="pr-link" href="${pr.url}" target="_blank">#${pr.number}</a>
+          <div class="pr-title">${pr.title}</div>
+        </td>
+        <td>${approverPills}</td>
+        <td style="text-align:center">${unresolvedHtml}</td>
+        <td><span class="${ageClass}">${ageText}</span></td>
+      </tr>`;
+    });
+  });
+
+  document.getElementById('ready-body').innerHTML = html;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
