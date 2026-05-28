@@ -1092,7 +1092,14 @@ function renderTable() {
           : `<span class="badge badge-amber">${pr.unresolved_threads}</span>`;
 
       const mineBadge = currentUser && pr.author === currentUser ? '<span class="badge badge-blue">Mine</span>' : '';
-      const reviewedBadge = pr.my_review ? `<span class="badge badge-green" title="${pr.my_review.replace(/_/g,' ').toLowerCase()}">Reviewed</span>` : '';
+      const reviewBadgeMap = {
+        'APPROVED':          ['badge-green', 'Approved'],
+        'COMMENTED':         ['badge-blue',  'Commented'],
+        'CHANGES_REQUESTED': ['badge-red',   'Changes req.'],
+        'DISMISSED':         ['badge-gray',  'Dismissed'],
+      };
+      const [reviewBadgeClass, reviewBadgeLabel] = reviewBadgeMap[pr.my_review] || [];
+      const reviewedBadge = reviewBadgeClass ? `<span class="badge ${reviewBadgeClass}">${reviewBadgeLabel}</span>` : '';
       const draftBadge = pr.draft ? '<span class="badge badge-gray">Draft</span>' : '';
       const initials = pr.author.slice(0, 2).toUpperCase();
 
