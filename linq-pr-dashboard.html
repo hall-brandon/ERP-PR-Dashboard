@@ -79,7 +79,7 @@
     font-size: 15px;
     font-weight: 500;
   }
-  .logo svg { opacity: 0.7; }
+  .logo svg { flex-shrink: 0; }
   .header-right { display: flex; align-items: center; gap: 12px; }
   .last-updated { font-size: 12px; color: var(--text3); }
   .auto-refresh-toggle {
@@ -562,18 +562,22 @@
     overflow-y: auto;
     padding: 8px 20px 4px;
   }
+  #repo-modal { width: 600px; }
   .modal-repo-item {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 0;
+    padding: 7px 0;
     border-bottom: 0.5px solid var(--border);
     font-size: 13px;
     color: var(--text);
   }
   .modal-repo-item:last-child { border-bottom: none; }
   .modal-repo-item input[type="checkbox"] { accent-color: var(--blue); width: 14px; height: 14px; margin: 0; cursor: pointer; flex-shrink: 0; }
-  .modal-repo-item label { cursor: pointer; flex: 1; }
+  .modal-repo-item label { cursor: pointer; flex: 1; min-width: 0; }
+  .modal-repo-item .repo-name-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modal-repo-item .repo-account { font-size: 10px; color: var(--text3); margin-top: 1px; }
+  .modal-repo-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; width: 140px; justify-content: flex-end; }
   .modal-footer {
     display: flex;
     align-items: center;
@@ -605,7 +609,7 @@
   .modal-override-input::placeholder { color: var(--text3); font-size: 11px; }
   .modal-override-input::-webkit-inner-spin-button,
   .modal-override-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  .modal-override-label { font-size: 10px; color: var(--text3); margin-right: 4px; white-space: nowrap; }
+
 
   /* ── Settings textarea ── */
   .settings-textarea {
@@ -622,6 +626,20 @@
     line-height: 1.5;
   }
   .settings-textarea:focus { border-color: var(--blue); }
+  .token-label-input {
+    width: 100%;
+    padding: 3px 6px;
+    border: 0.5px solid transparent;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    outline: none;
+  }
+  .token-label-input:hover { border-color: var(--border2); background: var(--bg2); }
+  .token-label-input:focus { border-color: var(--blue); background: var(--bg2); }
   .settings-number {
     width: 80px;
     padding: 7px 10px;
@@ -642,13 +660,23 @@
 
 <header>
   <div class="logo">
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <rect x="2" y="2" width="7" height="7" rx="1.5" fill="currentColor"/>
-      <rect x="11" y="2" width="7" height="7" rx="1.5" fill="currentColor" opacity=".4"/>
-      <rect x="2" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity=".4"/>
-      <rect x="11" y="11" width="7" height="7" rx="1.5" fill="currentColor" opacity=".7"/>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 361.5 599.3" style="height:26px;width:auto;--spark:#feae14;--ember:#fd6e31;">
+      <defs>
+        <linearGradient id="linq-hdr-g1" x1="211.4" x2="467" y1="195.475" y2="195.475" gradientTransform="matrix(1 0 0 -1 0 800)" gradientUnits="userSpaceOnUse">
+          <stop stop-color="var(--ember)"/>
+          <stop stop-color="var(--spark)" offset="1"/>
+        </linearGradient>
+        <linearGradient id="linq-hdr-g2" x1="158.45" x2="519.95" y1="489.85" y2="489.85" gradientTransform="matrix(1 0 0 -1 0 800)" gradientUnits="userSpaceOnUse">
+          <stop stop-color="var(--ember)"/>
+          <stop stop-color="var(--spark)" offset="1"/>
+        </linearGradient>
+      </defs>
+      <g transform="translate(-158.45 -95.6)">
+        <path fill="url(#linq-hdr-g1)" d="m211.4 567.1 127.8 127.8L467 567.1c-70.6-70.6-185-70.6-255.6 0z"/>
+        <path fill="url(#linq-hdr-g2)" d="M467 269.2s-11.2 48.2-42.6 85.3c18.9-87.4-20.4-194.9-85.2-258.9 0 61-71.9 119.8-127.8 173.5-70.6 70.6-70.6 185 0 255.6L339.2 397 467 524.7c70.6-70.5 70.6-184.9 0-255.5z"/>
+      </g>
     </svg>
-    LINQ PR Approval Dashboard
+    PR Approval Dashboard
   </div>
   <div class="header-right">
     <span class="last-updated" id="last-updated"></span>
@@ -823,11 +851,45 @@
         <button class="modal-close" onclick="closeSettingsModal()">✕</button>
       </div>
       <div style="flex:1;overflow-y:auto;padding:20px;">
-        <div style="margin-bottom:24px;">
+
+        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:0.5px solid var(--border);">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px;">Connected accounts</label>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6;">Add multiple GitHub PATs to pull repos from different orgs or accounts into one view.</p>
+          <div id="settings-tokens-list" style="margin-bottom:10px;"></div>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:200px;">
+              <input type="text" id="settings-new-label" class="modal-search"
+                style="margin:0;font-size:12px;" placeholder="Label  e.g. LINQ-ERP" autocomplete="off" />
+              <input type="password" id="settings-new-token" class="modal-search"
+                style="margin:0;font-family:monospace;font-size:12px;"
+                placeholder="Paste PAT…" autocomplete="off" />
+            </div>
+            <button class="btn" id="settings-add-token-btn" onclick="addExtraToken()">Add account</button>
+          </div>
+          <div id="settings-token-error" style="display:none;color:var(--red);font-size:12px;margin-top:6px;">Invalid token or unable to authenticate. Check the PAT and try again.</div>
+        </div>
+
+        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:0.5px solid var(--border);">
           <label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px;">Default required approvals</label>
           <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6;">Minimum approvals before a PR is considered ready to merge. Individual repos can override this in the Manage Repos modal (useful if branch protection rules aren't accessible).</p>
           <input type="number" id="settings-required" class="settings-number" min="1" max="20" />
         </div>
+
+        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:0.5px solid var(--border);">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px;">Auto-refresh interval</label>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6;">How often the dashboard automatically re-checks GitHub for new PRs.</p>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <input type="number" id="settings-refresh-interval" class="settings-number" min="1" max="1440" style="width:72px;" />
+            <span style="font-size:13px;color:var(--text2);">minutes</span>
+            <div style="display:flex;gap:5px;margin-left:4px;">
+              <button class="btn" style="font-size:11px;padding:4px 8px;" onclick="document.getElementById('settings-refresh-interval').value=5">5 min</button>
+              <button class="btn" style="font-size:11px;padding:4px 8px;" onclick="document.getElementById('settings-refresh-interval').value=15">15 min</button>
+              <button class="btn" style="font-size:11px;padding:4px 8px;" onclick="document.getElementById('settings-refresh-interval').value=30">30 min</button>
+              <button class="btn" style="font-size:11px;padding:4px 8px;" onclick="document.getElementById('settings-refresh-interval').value=60">1 hr</button>
+            </div>
+          </div>
+        </div>
+
         <div>
           <label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px;">Excluded authors</label>
           <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6;">GitHub usernames to hide from the dashboard (one per line). Useful for bots or service accounts.</p>
@@ -902,6 +964,14 @@ function getExcludedAuthors() {
 }
 function setExcludedAuthors(list) { localStorage.setItem('linq_gh_excluded', JSON.stringify(list)); }
 
+// Auto-refresh interval (minutes)
+function getRefreshIntervalMins() {
+  const v = parseInt(localStorage.getItem('linq_gh_refresh_mins') || '');
+  return isNaN(v) || v < 1 ? 30 : v;
+}
+function setRefreshIntervalMins(n) { localStorage.setItem('linq_gh_refresh_mins', String(n)); }
+function getRefreshIntervalMs() { return getRefreshIntervalMins() * 60 * 1000; }
+
 // Parse "owner/repo" full_name into parts
 function parseRepo(fullName) {
   const slash = fullName.indexOf('/');
@@ -923,21 +993,49 @@ function parseRepo(fullName) {
 
 let allFindings = [];
 let myReadyPRs = [];
-let currentUser = null;
+let currentUsers = [];        // logins for all connected PATs
 let allOrgRepos = null;
-let repoRequiredCache = {}; // full_name → count fetched from rulesets API
+let allOrgRepoTokens = {};    // full_name → token id (set when modal loads)
+let repoRequiredCache = {};   // full_name → count fetched from rulesets API
 let autoRefreshTimer = null;
-const AUTO_REFRESH_MS = 30 * 60 * 1000;
 
-// ── Token management ──────────────────────────────────────────────────────────
-function getToken() { return localStorage.getItem('linq_gh_token') || ''; }
-function setToken(t) { localStorage.setItem('linq_gh_token', t); }
-function clearToken() { localStorage.removeItem('linq_gh_token'); }
+// ── Token management (multi-PAT) ──────────────────────────────────────────────
+// Tokens stored as [{id, token, login}] in linq_gh_tokens
+function getTokens() {
+  try { return JSON.parse(localStorage.getItem('linq_gh_tokens') || '[]'); }
+  catch { return []; }
+}
+function setTokens(tokens) { localStorage.setItem('linq_gh_tokens', JSON.stringify(tokens)); }
+function getToken() { const t = getTokens(); return t.length ? t[0].token : ''; } // primary
+function clearToken() { localStorage.removeItem('linq_gh_tokens'); }
+
+// Which token to use for a given repo (falls back to primary)
+function getRepoTokenMap() {
+  try { return JSON.parse(localStorage.getItem('linq_gh_repo_tokens') || '{}'); }
+  catch { return {}; }
+}
+function setRepoTokenMap(map) { localStorage.setItem('linq_gh_repo_tokens', JSON.stringify(map)); }
+function getTokenForRepo(fullName) {
+  const map = getRepoTokenMap();
+  const tokens = getTokens();
+  const found = map[fullName] ? tokens.find(t => t.id === map[fullName]) : null;
+  return (found || tokens[0])?.token || '';
+}
+
+// Migrate old single-token storage → new array format
+(function migrateToken() {
+  const legacy = localStorage.getItem('linq_gh_token');
+  if (!legacy) return;
+  if (!getTokens().length) setTokens([{ id: 'tok_primary', token: legacy, login: null }]);
+  localStorage.removeItem('linq_gh_token');
+})();
 
 function saveToken() {
   const t = document.getElementById('token-input').value.trim();
   if (!t) return;
-  setToken(t);
+  // Fresh connection — replace all tokens and clear repo associations
+  setTokens([{ id: 'tok_primary', token: t, login: null }]);
+  localStorage.removeItem('linq_gh_repo_tokens');
   document.getElementById('token-error').style.display = 'none';
   showDashboard();
   runAudit();
@@ -945,10 +1043,12 @@ function saveToken() {
 
 function changeToken() {
   clearToken();
+  localStorage.removeItem('linq_gh_repo_tokens');
   allFindings = [];
   myReadyPRs = [];
-  currentUser = null;
+  currentUsers = [];
   allOrgRepos = null;
+  allOrgRepoTokens = {};
   repoRequiredCache = {};
   stopAutoRefresh();
   document.getElementById('dashboard').style.display = 'none';
@@ -976,7 +1076,7 @@ function startAutoRefresh() {
   stopAutoRefresh();
   const cb = document.getElementById('auto-refresh-cb');
   if (cb && !cb.checked) return;
-  autoRefreshTimer = setTimeout(runAudit, AUTO_REFRESH_MS);
+  autoRefreshTimer = setTimeout(runAudit, getRefreshIntervalMs());
 }
 
 function stopAutoRefresh() {
@@ -1114,7 +1214,7 @@ async function getUnresolvedThreadCount(owner, repo, num, token) {
   }
 }
 
-async function auditRepo(repoObj, token) {
+async function auditRepo(repoObj, token, userLogin = null) {
   const { owner, name, full_name } = repoObj;
 
   // Determine required approvals for this repo
@@ -1158,10 +1258,10 @@ async function auditRepo(repoObj, token) {
         requested_teams: (pr.requested_teams || []).map(t => t.slug),
         change_requests: changeRequests,
         unresolved_threads: unresolvedThreads,
-        my_review: currentUser ? (reviews.find(r => r.user.login === currentUser && r.state !== 'PENDING')?.state || null) : null,
+        my_review: userLogin ? (reviews.find(r => r.user.login === userLogin && r.state !== 'PENDING')?.state || null) : null,
         labels: (pr.labels || []).map(l => l.name),
       });
-    } else if (currentUser && pr.user.login === currentUser && !pr.draft) {
+    } else if (currentUsers.includes(pr.user.login) && !pr.draft) {
       readyPRs.push({
         repo: name, owner, full_name,
         number: pr.number, title: pr.title, url: pr.html_url,
@@ -1177,9 +1277,16 @@ async function auditRepo(repoObj, token) {
 
 // ── Run audit ─────────────────────────────────────────────────────────────────
 async function runAudit() {
-  const token = getToken();
-  if (!token) return;
-  if (!currentUser) currentUser = await fetchCurrentUser(token);
+  const tokens = getTokens();
+  if (!tokens.length) return;
+
+  // Resolve GitHub login for each token (cached in token object after first fetch)
+  let loginsUpdated = false;
+  for (const t of tokens) {
+    if (!t.login) { t.login = await fetchCurrentUser(t.token); loginsUpdated = true; }
+  }
+  if (loginsUpdated) setTokens(tokens);
+  currentUsers = tokens.map(t => t.login).filter(Boolean);
 
   const activeRepos = getActiveRepos();
 
@@ -1207,8 +1314,11 @@ async function runAudit() {
   const ready = [];
   for (const fullName of activeRepos) {
     const repoObj = parseRepo(fullName);
+    const repoToken = getTokenForRepo(fullName);
+    const repoTokenObj = tokens.find(t => t.token === repoToken);
+    const userLogin = repoTokenObj?.login || null;
     try {
-      const { findings: hits, readyPRs } = await auditRepo(repoObj, token);
+      const { findings: hits, readyPRs } = await auditRepo(repoObj, repoToken, userLogin);
       findings.push(...hits);
       ready.push(...readyPRs);
     } catch (e) {
@@ -1235,7 +1345,7 @@ async function runAudit() {
 
   const now = new Date();
   const autoEnabled = document.getElementById('auto-refresh-cb')?.checked !== false;
-  const nextRefresh = new Date(now.getTime() + AUTO_REFRESH_MS);
+  const nextRefresh = new Date(now.getTime() + getRefreshIntervalMs());
   const nextStr = autoEnabled ? ` · Next refresh ${nextRefresh.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}` : '';
   document.getElementById('last-updated').textContent =
     `Updated ${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}${nextStr}`;
@@ -1273,7 +1383,7 @@ function renderTable() {
   let data = statsBase.filter(p => {
     if (repoF && p.repo !== repoF) return false;
     if (appF !== '' && p.approvals !== parseInt(appF)) return false;
-    if (mineF === 'mine' && p.author !== currentUser) return false;
+    if (mineF === 'mine' && !currentUsers.includes(p.author)) return false;
     if (searchF && !p.title.toLowerCase().includes(searchF) && !p.author.toLowerCase().includes(searchF)) return false;
     return true;
   }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -1283,7 +1393,7 @@ function renderTable() {
   document.getElementById('s-zero').textContent = statsBase.filter(p => p.approvals === 0).length;
   document.getElementById('s-one').textContent = statsBase.filter(p => p.approvals === 1).length;
   document.getElementById('s-repos').textContent = new Set(statsBase.map(p => p.repo)).size;
-  document.getElementById('s-mine').textContent = currentUser ? statsBase.filter(p => p.author === currentUser).length : '—';
+  document.getElementById('s-mine').textContent = currentUsers.length ? statsBase.filter(p => currentUsers.includes(p.author)).length : '—';
   document.getElementById('result-count').textContent =
     `${data.length} PR${data.length !== 1 ? 's' : ''} shown`;
 
@@ -1336,7 +1446,7 @@ function renderTable() {
           ? '<span style="color:var(--text3);font-size:12px">—</span>'
           : `<span class="badge badge-amber">${pr.unresolved_threads}</span>`;
 
-      const mineBadge = currentUser && pr.author === currentUser ? '<span class="badge badge-blue">Mine</span>' : '';
+      const mineBadge = currentUsers.includes(pr.author) ? '<span class="badge badge-blue">Mine</span>' : '';
       const reviewBadgeMap = {
         'APPROVED':          ['badge-green', 'Approved'],
         'COMMENTED':         ['badge-blue',  'Commented'],
@@ -1376,15 +1486,22 @@ async function openRepoModal() {
 
   if (!allOrgRepos) {
     document.getElementById('repo-modal-list').innerHTML = '<div class="modal-empty">Loading repos…</div>';
-    const token = getToken();
-    // Use /user/repos — works with fine-grained tokens, no org name needed.
-    // Returns repos with full_name e.g. "LINQ-ERP/LINQ-ERP-v4"
-    const repos = await ghFetch('/user/repos', token,
-      '?per_page=100&sort=full_name&affiliation=owner,collaborator,organization_member') || [];
-    allOrgRepos = repos
-      .filter(r => !r.archived)
-      .map(r => r.full_name)
-      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    const tokens = getTokens();
+    const seen = new Set();
+    const repos = [];
+    allOrgRepoTokens = {};
+    for (const t of tokens) {
+      const fetched = await ghFetch('/user/repos', t.token,
+        '?per_page=100&sort=full_name&affiliation=owner,collaborator,organization_member') || [];
+      for (const r of fetched) {
+        if (!r.archived && !seen.has(r.full_name)) {
+          seen.add(r.full_name);
+          repos.push(r.full_name);
+          allOrgRepoTokens[r.full_name] = t.id;
+        }
+      }
+    }
+    allOrgRepos = repos.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
   }
 
   renderRepoModalList();
@@ -1400,33 +1517,44 @@ function renderRepoModalList(filter = '') {
     document.getElementById('repo-modal-list').innerHTML = '<div class="modal-empty">No repos match.</div>';
     return;
   }
+  const tokens = getTokens();
+  const multiPAT = tokens.length > 1;
   document.getElementById('repo-modal-list').innerHTML = filtered.map(fullName => {
     const { owner, name } = parseRepo(fullName);
     const cbId = `rc-${fullName.replace(/\//g, '__')}`;
-    const apiCount = repoRequiredCache[fullName];   // detected from rulesets
+    const tokenId = allOrgRepoTokens[fullName];
+    const tokenObj = tokens.find(t => t.id === tokenId);
+    const accountName = tokenObj ? (tokenObj.label || (tokenObj.login ? `@${tokenObj.login}` : null)) : null;
+    const accountBadge = multiPAT && accountName
+      ? `<div class="repo-account">${accountName}</div>`
+      : '';
+    const apiCount = repoRequiredCache[fullName];   // detected from rulesets (undefined if not yet fetched)
     const hasOverride = overrides[fullName] != null;
-    const isOverridden = hasOverride && apiCount != null && overrides[fullName] !== apiCount;
     // Pre-fill with the override if set, otherwise the detected count, otherwise blank
     const inputVal = hasOverride ? overrides[fullName] : (apiCount != null ? apiCount : '');
     // Placeholder shows detected count (or global default) when field is cleared
     const placeholder = apiCount != null ? apiCount : globalRequired;
-    const sourceTag = apiCount != null
-      ? isOverridden
-        ? `<span style="font-size:10px;color:var(--amber);white-space:nowrap;margin-right:2px;" title="Manually overridden — ruleset requires ${apiCount}">overridden</span>`
-        : `<span style="font-size:10px;color:var(--green);white-space:nowrap;margin-right:2px;" title="Value read from repository ruleset">✓ ruleset</span>`
-      : '';
+    // "overridden" shows whenever a manual value is stored, regardless of cache state.
+    // "✓ ruleset" only shows when there's no override and the cache has a value.
+    const sourceTag = hasOverride
+      ? `<span style="font-size:10px;color:var(--amber);white-space:nowrap;margin-right:2px;" title="${apiCount != null ? `Manually overridden — ruleset requires ${apiCount}` : 'Manually overridden — ruleset value not yet loaded'}">overridden</span>`
+      : apiCount != null
+        ? `<span style="font-size:10px;color:var(--green);white-space:nowrap;margin-right:2px;" title="Value read from repository ruleset">✓ ruleset</span>`
+        : '';
     const inputTitle = apiCount != null
       ? `Ruleset requires ${apiCount}. You can set a higher value to override, or clear to use the detected value.`
       : `Set a required approvals count for this repo, or leave blank to use the global default (${globalRequired}).`;
     return `<div class="modal-repo-item">
       <input type="checkbox" id="${cbId}" ${active.includes(fullName) ? 'checked' : ''} />
-      <label for="${cbId}" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">
-        <span style="font-size:11px;color:var(--text3)">${owner}/</span>${name}
+      <label for="${cbId}">
+        <div class="repo-name-line"><span style="font-size:11px;color:var(--text3)">${owner}/</span>${name}</div>
+        ${accountBadge}
       </label>
-      ${sourceTag}
-      <span class="modal-override-label">approvals:</span>
-      <input type="number" class="modal-override-input" data-repo="${fullName}" data-api-count="${apiCount ?? ''}"
-        value="${inputVal}" min="1" max="20" placeholder="${placeholder}" title="${inputTitle}" />
+      <div class="modal-repo-controls">
+        ${sourceTag}
+        <input type="number" class="modal-override-input" data-repo="${fullName}" data-api-count="${apiCount ?? ''}"
+          value="${inputVal}" min="1" max="20" placeholder="${placeholder}" title="${inputTitle}" />
+      </div>
     </div>`;
   }).join('');
 }
@@ -1444,10 +1572,78 @@ function closeRepoModal() {
 }
 
 // ── Settings modal ────────────────────────────────────────────────────────────
-function openSettingsModal() {
+function renderTokensList() {
+  const tokens = getTokens();
+  document.getElementById('settings-tokens-list').innerHTML = tokens.map((t, i) => {
+    const labelVal = t.label || '';
+    const loginLine = t.login ? `<div style="font-size:11px;color:var(--text3);">@${t.login}</div>` : '';
+    const removeBtn = i === 0
+      ? `<span style="font-size:11px;color:var(--text3);white-space:nowrap;">primary</span>`
+      : `<button class="link-btn" style="color:var(--red);white-space:nowrap;" onclick="removeExtraToken('${t.id}')">Remove</button>`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border);">
+      <div style="flex:1;min-width:0;">
+        <input class="token-label-input" data-id="${t.id}" value="${labelVal}"
+          placeholder="${t.login ? '@' + t.login : 'Add a label…'}"
+          onblur="saveTokenLabel(this)" onkeydown="if(event.key==='Enter')this.blur()" />
+        ${loginLine}
+      </div>
+      ${removeBtn}
+    </div>`;
+  }).join('') || '<p style="font-size:12px;color:var(--text3);">No accounts connected.</p>';
+}
+
+async function addExtraToken() {
+  const labelInput = document.getElementById('settings-new-label');
+  const tokenInput = document.getElementById('settings-new-token');
+  const tokenStr = tokenInput.value.trim();
+  if (!tokenStr) return;
+  const btn = document.getElementById('settings-add-token-btn');
+  const errEl = document.getElementById('settings-token-error');
+  btn.textContent = 'Connecting…'; btn.disabled = true; errEl.style.display = 'none';
+  const login = await fetchCurrentUser(tokenStr);
+  btn.textContent = 'Add account'; btn.disabled = false;
+  if (!login) { errEl.style.display = 'block'; return; }
+  const tokens = getTokens();
+  if (tokens.some(t => t.token === tokenStr)) { tokenInput.value = ''; labelInput.value = ''; return; }
+  tokens.push({ id: 'tok_' + Date.now(), token: tokenStr, login, label: labelInput.value.trim() });
+  setTokens(tokens);
+  allOrgRepos = null; allOrgRepoTokens = {};
+  tokenInput.value = ''; labelInput.value = '';
+  renderTokensList();
+}
+
+function saveTokenLabel(input) {
+  const tokens = getTokens();
+  const t = tokens.find(t => t.id === input.dataset.id);
+  if (t) { t.label = input.value.trim(); setTokens(tokens); }
+}
+
+function removeExtraToken(id) {
+  const tokens = getTokens().filter(t => t.id !== id);
+  setTokens(tokens);
+  // Remove repo-token associations for this PAT
+  const map = getRepoTokenMap();
+  Object.keys(map).forEach(repo => { if (map[repo] === id) delete map[repo]; });
+  setRepoTokenMap(map);
+  allOrgRepos = null; allOrgRepoTokens = {};
+  renderTokensList();
+}
+
+async function openSettingsModal() {
   document.getElementById('settings-required').value = getRequiredApprovals();
+  document.getElementById('settings-refresh-interval').value = getRefreshIntervalMins();
   document.getElementById('settings-excluded').value = getExcludedAuthors().join('\n');
+  document.getElementById('settings-token-error').style.display = 'none';
+  document.getElementById('settings-new-token').value = '';
   document.getElementById('settings-modal-overlay').style.display = 'flex';
+  // Fetch any logins that aren't resolved yet (e.g. before first audit)
+  const tokens = getTokens();
+  let updated = false;
+  for (const t of tokens) {
+    if (!t.login) { t.login = await fetchCurrentUser(t.token); updated = true; }
+  }
+  if (updated) setTokens(tokens);
+  renderTokensList();
 }
 
 function closeSettingsModal() {
@@ -1461,12 +1657,15 @@ function handleSettingsOverlayClick(e) {
 function saveSettings() {
   const req = parseInt(document.getElementById('settings-required').value);
   if (!isNaN(req) && req >= 1) setRequiredApprovals(req);
+  const interval = parseInt(document.getElementById('settings-refresh-interval').value);
+  if (!isNaN(interval) && interval >= 1) setRefreshIntervalMins(interval);
   const excluded = document.getElementById('settings-excluded').value
     .split('\n')
     .map(s => s.trim())
     .filter(Boolean);
   setExcludedAuthors(excluded);
   closeSettingsModal();
+  startAutoRefresh(); // restart timer with new interval before running audit
   runAudit();
 }
 
@@ -1501,6 +1700,12 @@ function saveRepoSelection() {
     if (repo && !isNaN(val) && val >= 1 && val !== apiCount) overrides[repo] = val;
   });
   setRepoOverrides(overrides);
+  // Save which token to use per selected repo
+  const repoTokenMap = {};
+  selected.forEach(fullName => {
+    if (allOrgRepoTokens[fullName]) repoTokenMap[fullName] = allOrgRepoTokens[fullName];
+  });
+  setRepoTokenMap(repoTokenMap);
   setActiveRepos(selected);
   closeRepoModal();
   runAudit();
