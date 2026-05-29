@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LINQ PR Approval Dashboard</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<script>
+  (function() {
+    var t = localStorage.getItem('linq_gh_theme');
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  })();
+</script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -49,6 +56,33 @@
       --green-bg: #27500A;
     }
   }
+
+  /* ── Manual theme overrides (beat the media query via higher specificity) ── */
+  html[data-theme="light"] {
+    --bg: #ffffff; --bg2: #f5f5f4; --bg3: #efefed;
+    --text: #1a1a18; --text2: #6b6b67; --text3: #9b9b96;
+    --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+    --blue: #185FA5; --blue-bg: #E6F1FB;
+    --red: #E24B4A; --red-bg: #FCEBEB;
+    --amber: #BA7517; --amber-bg: #FAEEDA;
+    --green: #3B6D11; --green-bg: #EAF3DE;
+  }
+  html[data-theme="dark"] {
+    --bg: #1c1c1a; --bg2: #252523; --bg3: #2e2e2b;
+    --text: #f0ede8; --text2: #a8a8a3; --text3: #6b6b67;
+    --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+    --blue: #85B7EB; --blue-bg: #0C447C;
+    --red: #F09595; --red-bg: #501313;
+    --amber: #EF9F27; --amber-bg: #633806;
+    --green: #97C459; --green-bg: #27500A;
+  }
+
+  /* ── Theme segment control ── */
+  .theme-seg { display: flex; border: 0.5px solid var(--border2); border-radius: var(--radius); overflow: hidden; width: fit-content; }
+  .theme-seg button { padding: 6px 16px; background: none; border: none; border-right: 0.5px solid var(--border2); font-size: 12px; color: var(--text2); cursor: pointer; font-family: inherit; }
+  .theme-seg button:last-child { border-right: none; }
+  .theme-seg button.active { background: var(--bg3); color: var(--text); font-weight: 500; }
+  .theme-seg button:hover:not(.active) { background: var(--bg2); color: var(--text); }
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -890,6 +924,16 @@
           </div>
         </div>
 
+        <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:0.5px solid var(--border);">
+          <label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px;">Appearance</label>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6;">Choose a color scheme, or follow the system setting.</p>
+          <div class="theme-seg" role="group" aria-label="Color scheme">
+            <button id="theme-btn-light" onclick="applyTheme('light')">☀ Light</button>
+            <button id="theme-btn-dark" onclick="applyTheme('dark')">☾ Dark</button>
+            <button id="theme-btn-system" onclick="applyTheme('system')">⊙ System</button>
+          </div>
+        </div>
+
         <div>
           <label style="font-size:13px;font-weight:500;display:block;margin-bottom:6px;">Excluded authors</label>
           <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6;">GitHub usernames to hide from the dashboard (one per line). Useful for bots or service accounts.</p>
@@ -963,6 +1007,22 @@ function getExcludedAuthors() {
   } catch { return []; }
 }
 function setExcludedAuthors(list) { localStorage.setItem('linq_gh_excluded', JSON.stringify(list)); }
+
+// Theme
+function applyTheme(t) {
+  localStorage.setItem('linq_gh_theme', t);
+  if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  else if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  updateThemeButtons();
+}
+function updateThemeButtons() {
+  const t = localStorage.getItem('linq_gh_theme') || 'system';
+  ['light', 'dark', 'system'].forEach(v => {
+    const btn = document.getElementById(`theme-btn-${v}`);
+    if (btn) btn.classList.toggle('active', v === t);
+  });
+}
 
 // Auto-refresh interval (minutes)
 function getRefreshIntervalMins() {
@@ -1636,6 +1696,7 @@ async function openSettingsModal() {
   document.getElementById('settings-token-error').style.display = 'none';
   document.getElementById('settings-new-token').value = '';
   document.getElementById('settings-modal-overlay').style.display = 'flex';
+  updateThemeButtons();
   // Fetch any logins that aren't resolved yet (e.g. before first audit)
   const tokens = getTokens();
   let updated = false;
