@@ -1057,6 +1057,7 @@ let currentUsers = [];        // logins for all connected PATs
 let allOrgRepos = null;
 let allOrgRepoTokens = {};    // full_name → token id (set when modal loads)
 let repoRequiredCache = {};   // full_name → count fetched from rulesets API
+let pendingActiveRepos = null; // working Set for the repo modal — survives filtering
 let autoRefreshTimer = null;
 
 // ── Token management (multi-PAT) ──────────────────────────────────────────────
@@ -1564,12 +1565,12 @@ async function openRepoModal() {
     allOrgRepos = repos.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
   }
 
+  pendingActiveRepos = new Set(getActiveRepos());
   renderRepoModalList();
   document.getElementById('repo-modal-search').focus();
 }
 
 function renderRepoModalList(filter = '') {
-  const active = getActiveRepos();
   const overrides = getRepoOverrides();
   const globalRequired = getRequiredApprovals();
   const filtered = (allOrgRepos || []).filter(r => r.toLowerCase().includes(filter.toLowerCase()));
@@ -1605,7 +1606,8 @@ function renderRepoModalList(filter = '') {
       ? `Ruleset requires ${apiCount}. You can set a higher value to override, or clear to use the detected value.`
       : `Set a required approvals count for this repo, or leave blank to use the global default (${globalRequired}).`;
     return `<div class="modal-repo-item">
-      <input type="checkbox" id="${cbId}" ${active.includes(fullName) ? 'checked' : ''} />
+      <input type="checkbox" id="${cbId}" ${pendingActiveRepos && pendingActiveRepos.has(fullName) ? 'checked' : ''}
+        onchange="togglePendingRepo('${fullName}', this.checked)" />
       <label for="${cbId}">
         <div class="repo-name-line"><span style="font-size:11px;color:var(--text3)">${owner}/</span>${name}</div>
         ${accountBadge}
@@ -1738,27 +1740,35 @@ function resetRepoOverrides() {
   });
 }
 
+function togglePendingRepo(fullName, checked) {
+  if (!pendingActiveRepos) return;
+  if (checked) pendingActiveRepos.add(fullName);
+  else pendingActiveRepos.delete(fullName);
+}
+
 function deselectAllRepos() {
-  if (!allOrgRepos) return;
-  allOrgRepos.forEach(fullName => {
-    const cb = document.getElementById(`rc-${fullName.replace(/\//g, '__')}`);
-    if (cb) cb.checked = false;
-  });
+  if (!pendingActiveRepos) return;
+  pendingActiveRepos.clear();
+  // Uncheck whatever is currently visible
+  document.querySelectorAll('#repo-modal-list input[type="checkbox"]').forEach(cb => { cb.checked = false; });
 }
 
 function saveRepoSelection() {
-  if (!allOrgRepos) return;
-  const selected = allOrgRepos.filter(fullName => {
-    const cb = document.getElementById(`rc-${fullName.replace(/\//g, '__')}`);
-    return cb && cb.checked;
-  });
-  // Gather per-repo override values — only store when the value differs from the detected ruleset count
-  const overrides = {};
+  if (!allOrgRepos || !pendingActiveRepos) return;
+  // Use the pending Set — includes repos that were filtered out of the current view
+  const selected = allOrgRepos.filter(n => pendingActiveRepos.has(n));
+  // Merge overrides: start from stored values, update only the repos currently visible
+  const overrides = getRepoOverrides();
   document.querySelectorAll('.modal-override-input').forEach(input => {
     const repo = input.dataset.repo;
     const val = parseInt(input.value);
-    const apiCount = parseInt(input.dataset.apiCount);
-    if (repo && !isNaN(val) && val >= 1 && val !== apiCount) overrides[repo] = val;
+    const apiCount = input.dataset.apiCount !== '' ? parseInt(input.dataset.apiCount) : null;
+    if (!repo) return;
+    if (!isNaN(val) && val >= 1 && val !== apiCount) {
+      overrides[repo] = val;   // set or update
+    } else {
+      delete overrides[repo];  // cleared — remove the override
+    }
   });
   setRepoOverrides(overrides);
   // Save which token to use per selected repo
